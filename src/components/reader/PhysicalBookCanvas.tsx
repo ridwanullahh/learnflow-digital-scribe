@@ -12,21 +12,30 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import * as Slider from '@radix-ui/react-slider';
 
 interface PhysicalBookCanvasProps {
+  bookId: string;
+  pageNumber: number;
   pageContent: string;
   onContentChange: (content: string) => void;
-  difficultyLevel: number;
-  onDifficultyChange: (level: number) => void;
+  onSaveAnnotation: (annotation: any) => void;
+  blurMode: boolean;
+  blurLevel: number;
+  onBlurToggle: () => void;
+  onBlurLevelChange: (level: number) => void;
   className?: string;
 }
 
 export const PhysicalBookCanvas = ({
+  bookId,
+  pageNumber,
   pageContent,
   onContentChange,
-  difficultyLevel,
-  onDifficultyChange,
+  onSaveAnnotation,
+  blurMode,
+  blurLevel,
+  onBlurToggle,
+  onBlurLevelChange,
   className = ""
 }: PhysicalBookCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,7 +43,6 @@ export const PhysicalBookCanvas = ({
   const [currentTool, setCurrentTool] = useState<'pen' | 'eraser' | 'highlighter'>('pen');
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [color, setColor] = useState('#000000');
-  const [showBlurLayer, setShowBlurLayer] = useState(false);
   const [history, setHistory] = useState<ImageData[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
@@ -149,6 +157,17 @@ export const PhysicalBookCanvas = ({
     newHistory.push(imageData);
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
+
+    // Save annotation
+    const dataUrl = canvas.toDataURL();
+    onSaveAnnotation({
+      type: 'drawing',
+      data: dataUrl,
+      tool: currentTool,
+      color: color,
+      strokeWidth: strokeWidth,
+      timestamp: new Date().toISOString()
+    });
   };
 
   const undo = () => {
@@ -228,19 +247,14 @@ export const PhysicalBookCanvas = ({
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Size:</span>
-          <Slider.Root
-            value={[strokeWidth]}
-            onValueChange={([value]) => setStrokeWidth(value)}
-            max={10}
-            min={1}
-            step={1}
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={strokeWidth}
+            onChange={(e) => setStrokeWidth(Number(e.target.value))}
             className="w-16"
-          >
-            <Slider.Track className="bg-secondary relative h-1 w-full rounded-full">
-              <Slider.Range className="absolute h-full bg-primary rounded-full" />
-            </Slider.Track>
-            <Slider.Thumb className="block w-3 h-3 bg-primary rounded-full shadow-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2" />
-          </Slider.Root>
+          />
         </div>
 
         <Separator orientation="vertical" className="h-6" />
@@ -292,29 +306,24 @@ export const PhysicalBookCanvas = ({
         <Separator orientation="vertical" className="h-6" />
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Difficulty:</span>
-          <Slider.Root
-            value={[difficultyLevel]}
-            onValueChange={([value]) => onDifficultyChange(value)}
-            max={5}
-            min={1}
-            step={1}
+          <span className="text-sm text-muted-foreground">Blur:</span>
+          <input
+            type="range"
+            min="0"
+            max="10"
+            value={blurLevel}
+            onChange={(e) => onBlurLevelChange(Number(e.target.value))}
             className="w-20"
-          >
-            <Slider.Track className="bg-secondary relative h-1 w-full rounded-full">
-              <Slider.Range className="absolute h-full bg-primary rounded-full" />
-            </Slider.Track>
-            <Slider.Thumb className="block w-3 h-3 bg-primary rounded-full shadow-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2" />
-          </Slider.Root>
+          />
         </div>
 
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setShowBlurLayer(!showBlurLayer)}
+          onClick={onBlurToggle}
           className="h-8 w-8 p-0"
         >
-          {showBlurLayer ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          {blurMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </Button>
       </div>
 
@@ -328,11 +337,11 @@ export const PhysicalBookCanvas = ({
           onMouseLeave={stopDrawing}
           className="absolute inset-0 w-full h-full cursor-crosshair bg-white"
           style={{
-            filter: showBlurLayer ? `blur(${difficultyLevel}px)` : 'none'
+            filter: blurMode ? `blur(${blurLevel}px)` : 'none'
           }}
         />
         
-        {showBlurLayer && (
+        {blurMode && (
           <div className="absolute inset-0 bg-black bg-opacity-10 pointer-events-none" />
         )}
       </div>

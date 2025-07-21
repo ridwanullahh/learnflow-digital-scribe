@@ -6,13 +6,10 @@ import {
   Pen, 
   Eraser, 
   Highlighter, 
-  Undo, 
-  Redo, 
   Trash2,
   Eye,
   EyeOff
 } from 'lucide-react';
-import * as Slider from '@radix-ui/react-slider';
 
 interface ReadingCanvasProps {
   pageContent: string;
@@ -200,19 +197,14 @@ export const ReadingCanvas = ({
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Size:</span>
-          <Slider.Root
-            value={[strokeWidth]}
-            onValueChange={([value]) => setStrokeWidth(value)}
-            max={10}
-            min={1}
-            step={1}
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={strokeWidth}
+            onChange={(e) => setStrokeWidth(Number(e.target.value))}
             className="w-16"
-          >
-            <Slider.Track className="bg-secondary relative h-1 w-full rounded-full">
-              <Slider.Range className="absolute h-full bg-primary rounded-full" />
-            </Slider.Track>
-            <Slider.Thumb className="block w-3 h-3 bg-primary rounded-full shadow-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2" />
-          </Slider.Root>
+          />
         </div>
 
         <Separator orientation="vertical" className="h-6" />
@@ -247,19 +239,14 @@ export const ReadingCanvas = ({
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Difficulty:</span>
-          <Slider.Root
-            value={[difficultyLevel]}
-            onValueChange={([value]) => onDifficultyChange(value)}
-            max={5}
-            min={1}
-            step={1}
+          <input
+            type="range"
+            min="1"
+            max="5"
+            value={difficultyLevel}
+            onChange={(e) => onDifficultyChange(Number(e.target.value))}
             className="w-20"
-          >
-            <Slider.Track className="bg-secondary relative h-1 w-full rounded-full">
-              <Slider.Range className="absolute h-full bg-primary rounded-full" />
-            </Slider.Track>
-            <Slider.Thumb className="block w-3 h-3 bg-primary rounded-full shadow-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2" />
-          </Slider.Root>
+          />
         </div>
 
         <Button
