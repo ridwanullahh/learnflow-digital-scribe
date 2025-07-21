@@ -8,12 +8,6 @@ export interface Book {
   pages: BookPage[];
   userId: string;
   isPublic: boolean;
-  category: string;
-  language: string;
-  readingProgress: number;
-  totalPages: number;
-  coverImage?: string;
-  mode?: 'physical-book' | 'ebook';
   createdAt: string;
   updatedAt: string;
 }
@@ -23,18 +17,7 @@ export interface BookPage {
   pageNumber: number;
   content: string;
   annotations: Annotation[];
-  drawings: Drawing[];
   blurLayers: BlurLayer[];
-}
-
-export interface Drawing {
-  id: string;
-  pageId: string;
-  data: string; // Base64 canvas data
-  tool: 'pen' | 'eraser' | 'highlighter';
-  color: string;
-  strokeWidth: number;
-  timestamp: string;
 }
 
 export interface Annotation {
@@ -82,7 +65,6 @@ export interface AIGeneratedContent {
     start: number;
     end: number;
   };
-  cached: boolean;
   createdAt: string;
 }
 
