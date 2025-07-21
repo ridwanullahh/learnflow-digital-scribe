@@ -161,6 +161,7 @@ class UniversalSDK {
   private pollingIntervals: Record<string, number> = {};
   private writeQueue: QueuedWrite[] = [];
   private isProcessingQueue = false;
+  private repoInitialized = false;
 
   constructor(config: UniversalSDKConfig) {
     this.owner = config.owner;
@@ -213,6 +214,65 @@ class UniversalSDK {
     this.auditLog = {};
   }
 
+  private safeBase64Encode(str: string): string {
+    try {
+      // Use TextEncoder to handle Unicode characters properly
+      const bytes = new TextEncoder().encode(str);
+      return btoa(String.fromCharCode(...bytes));
+    } catch (error) {
+      // Fallback: escape non-Latin characters
+      return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+        return String.fromCharCode(parseInt(p1, 16));
+      }));
+    }
+  }
+
+  private safeBase64Decode(str: string): string {
+    try {
+      const decoded = atob(str);
+      const bytes = new Uint8Array(decoded.split('').map(char => char.charCodeAt(0)));
+      return new TextDecoder().decode(bytes);
+    } catch (error) {
+      // Fallback
+      try {
+        return decodeURIComponent(atob(str).split('').map(c => {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+      } catch (fallbackError) {
+        return atob(str);
+      }
+    }
+  }
+
+  private async ensureRepoExists(): Promise<void> {
+    if (this.repoInitialized) return;
+    
+    try {
+      // Check if repo exists
+      const repoUrl = `https://api.github.com/repos/${this.owner}/${this.repo}`;
+      const repoRes = await fetch(repoUrl, { headers: this.headers() });
+      
+      if (repoRes.status === 404) {
+        // Create repository
+        const createUrl = 'https://api.github.com/user/repos';
+        await fetch(createUrl, {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify({
+            name: this.repo,
+            private: false,
+            description: 'Learnflow Digital Scribe Database',
+            auto_init: true
+          })
+        });
+      }
+      
+      this.repoInitialized = true;
+    } catch (error) {
+      console.warn('Failed to ensure repo exists:', error);
+    }
+  }
+
   private headers(): Record<string, string> {
     return {
       Authorization: `token ${this.token}`,
@@ -221,6 +281,11 @@ class UniversalSDK {
   }
 
   public async request(path: string, method: string = "GET", body: any = null, etag?: string): Promise<any> {
+    // Check if repo exists, create if needed
+    if (method === "GET" && !this.cache[path.split('/').pop()?.replace('.json', '') || '']) {
+      await this.ensureRepoExists();
+    }
+    
     const url = `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${path}` +
                 (method === "GET" ? `?ref=${this.branch}` : "");
     
@@ -239,7 +304,13 @@ class UniversalSDK {
       return { notModified: true };
     }
 
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      if (res.status === 404 && method === "GET") {
+        // File doesn't exist, return empty data
+        return null;
+      }
+      throw new Error(await res.text());
+    }
     
     if (res.status === 204 || res.status === 201) {
         return { success: true, ...await res.json() };
@@ -260,7 +331,7 @@ class UniversalSDK {
       if (res.notModified) {
         return cacheEntry.data;
       }
-      const data = JSON.parse(atob(res.content));
+      const data = JSON.parse(this.safeBase64Decode(res.content));
       this.cache[collection] = { data, etag: res.etag, sha: res.sha };
       this.notifySubscribers(collection, data);
       return data;
@@ -313,7 +384,7 @@ class UniversalSDK {
       const res = await this.request(`${this.basePath}/${collection}.json`, "GET", null, cacheEntry?.etag);
 
       if (!res.notModified) {
-        const data = JSON.parse(atob(res.content));
+        const data = JSON.parse(this.safeBase64Decode(res.content));
         this.cache[collection] = { data, etag: res.etag, sha: res.sha };
         this.notifySubscribers(collection, data);
       }
@@ -341,7 +412,7 @@ class UniversalSDK {
       
       await this.request(`${this.basePath}/${collection}.json`, "PUT", {
           message: `Update ${collection} - ${new Date().toISOString()}`,
-          content: btoa(JSON.stringify(data, null, 2)),
+          content: this.safeBase64Encode(JSON.stringify(data, null, 2)),
           branch: this.branch,
           sha: file.sha,
       });

@@ -2,9 +2,10 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
-import { ArrowLeft, BookOpen, Settings, Volume2, Brain, Eye, ChevronLeft, ChevronRight, Menu, Palette } from 'lucide-react';
+import { ArrowLeft, BookOpen, Settings, Volume2, Brain, Eye, ChevronLeft, ChevronRight, Menu, Palette, PenTool, FileText, WifiOff } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { ReadingCanvas } from './ReadingCanvas';
+import { PhysicalBookCanvas } from './PhysicalBookCanvas';
 import { AIToolsPanel } from './AIToolsPanel';
 import { ReaderSettings } from './ReaderSettings';
 
@@ -26,6 +27,7 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
   const [fontSize, setFontSize] = useState(16);
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [textColor, setTextColor] = useState('#000000');
+  const [viewMode, setViewMode] = useState<'reading' | 'physical'>('physical');
 
   useEffect(() => {
     loadBook();
@@ -120,52 +122,68 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen bg-background safe-area-top">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-background/95 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-primary" />
-            <div className="hidden sm:block">
-              <h1 className="font-semibold text-foreground">{book.title}</h1>
-              <p className="text-sm text-muted-foreground">{book.author}</p>
+      <div className="glass border-b border-border/50 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={onBack} className="mobile-button">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="font-bold text-foreground text-sm truncate">{book.title}</h1>
+                <p className="text-xs text-muted-foreground truncate">{book.author}</p>
+              </div>
             </div>
           </div>
-        </div>
         
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={handleTTSToggle}
-            className={isReading ? 'bg-primary/20' : ''}
-          >
-            <Volume2 className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant={blurMode ? "default" : "ghost"} 
-            size="icon"
-            onClick={() => setBlurMode(!blurMode)}
-          >
-            <Eye className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant={showAIPanel ? "default" : "ghost"} 
-            size="icon"
-            onClick={() => setShowAIPanel(!showAIPanel)}
-          >
-            <Brain className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={() => setShowSettings(!showSettings)}
-          >
-            <Settings className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button 
+              variant={viewMode === 'physical' ? "default" : "ghost"} 
+              size="icon"
+              onClick={() => setViewMode(viewMode === 'physical' ? 'reading' : 'physical')}
+              title="Toggle Physical Book Mode"
+              className="mobile-button w-10 h-10"
+            >
+              <PenTool className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={handleTTSToggle}
+              className={`mobile-button w-10 h-10 ${isReading ? 'bg-primary/20' : ''}`}
+            >
+              <Volume2 className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant={blurMode ? "default" : "ghost"} 
+              size="icon"
+              onClick={() => setBlurMode(!blurMode)}
+              className="mobile-button w-10 h-10"
+            >
+              <Eye className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant={showAIPanel ? "default" : "ghost"} 
+              size="icon"
+              onClick={() => setShowAIPanel(!showAIPanel)}
+              className="mobile-button w-10 h-10"
+            >
+              <Brain className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setShowSettings(!showSettings)}
+              className="mobile-button w-10 h-10"
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -174,51 +192,78 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
         {/* Reading Area */}
         <div className="flex-1 flex flex-col">
           <div className="flex-1 p-4 overflow-y-auto">
-            <ReadingCanvas
-              content={getCurrentPageText()}
-              blurMode={blurMode}
-              blurLevel={blurLevel}
-              fontSize={fontSize}
-              backgroundColor={backgroundColor}
-              textColor={textColor}
-              bookId={bookId}
-              pageNumber={currentPage}
-            />
+            {viewMode === 'physical' ? (
+              <PhysicalBookCanvas
+                content={getCurrentPageText()}
+                onContentChange={(newContent) => {
+                  // Save user's content changes
+                  console.log('Content updated:', newContent);
+                }}
+                blurMode={blurMode}
+                blurLevel={blurLevel}
+                fontSize={fontSize}
+                backgroundColor={backgroundColor}
+                textColor={textColor}
+                bookId={bookId}
+                pageNumber={currentPage}
+              />
+            ) : (
+              <ReadingCanvas
+                content={getCurrentPageText()}
+                blurMode={blurMode}
+                blurLevel={blurLevel}
+                fontSize={fontSize}
+                backgroundColor={backgroundColor}
+                textColor={textColor}
+                bookId={bookId}
+                pageNumber={currentPage}
+              />
+            )}
           </div>
 
           {/* Page Navigation */}
-          <div className="flex items-center justify-between p-4 border-t border-border bg-background/95 backdrop-blur">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="text-sm text-muted-foreground min-w-0">
-                Page {currentPage} of {book.totalPages || 1}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === (book.totalPages || 1)}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
+          <div className="mobile-nav p-4 safe-area-bottom">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="mobile-button w-10 h-10 p-0"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex flex-col items-center min-w-0 px-3">
+                  <span className="text-sm font-medium text-foreground">
+                    Page {currentPage}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    of {book.totalPages || 1}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === (book.totalPages || 1)}
+                  className="mobile-button w-10 h-10 p-0"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
 
-            <div className="flex items-center gap-2">
-              {isOffline && (
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                  Offline
-                </span>
-              )}
-              <span className="text-xs text-muted-foreground">
-                {Math.round((currentPage / (book.totalPages || 1)) * 100)}% complete
-              </span>
+              <div className="flex items-center gap-2">
+                {isOffline && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-lg">
+                    <WifiOff className="w-3 h-3" />
+                    Offline
+                  </div>
+                )}
+                <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-lg">
+                  {Math.round((currentPage / (book.totalPages || 1)) * 100)}%
+                </div>
+              </div>
             </div>
           </div>
 

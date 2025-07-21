@@ -21,10 +21,11 @@ export const CreateBookDialog = ({ isOpen, onClose, onSubmit }: CreateBookDialog
     category: '',
     language: 'en',
     content: '',
-    coverImage: ''
+    coverImage: '',
+    mode: 'physical' // Default to physical book mode
   });
 
-  const [activeTab, setActiveTab] = useState<'manual' | 'upload' | 'import'>('manual');
+  const [activeTab, setActiveTab] = useState<'quick' | 'upload' | 'import'>('quick');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +38,8 @@ export const CreateBookDialog = ({ isOpen, onClose, onSubmit }: CreateBookDialog
       category: '',
       language: 'en',
       content: '',
-      coverImage: ''
+      coverImage: '',
+      mode: 'physical'
     });
   };
 
@@ -62,15 +64,15 @@ export const CreateBookDialog = ({ isOpen, onClose, onSubmit }: CreateBookDialog
 
         <div className="flex border-b border-border mb-4">
           <button
-            onClick={() => setActiveTab('manual')}
+            onClick={() => setActiveTab('quick')}
             className={`flex-1 py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'manual'
+              activeTab === 'quick'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             <BookOpen className="w-4 h-4 inline mr-2" />
-            Manual Entry
+            Quick Start
           </button>
           <button
             onClick={() => setActiveTab('upload')}
@@ -154,16 +156,24 @@ export const CreateBookDialog = ({ isOpen, onClose, onSubmit }: CreateBookDialog
             </div>
           </div>
 
-          {activeTab === 'manual' && (
-            <div className="space-y-2">
-              <Label htmlFor="content">Content</Label>
-              <Textarea
-                id="content"
-                value={formData.content}
-                onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="Enter book content or paste text here..."
-                rows={6}
-              />
+          {activeTab === 'quick' && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <h4 className="font-medium mb-2">📚 Physical Book Mode</h4>
+                <p className="text-sm text-muted-foreground">
+                  Start with a blank digital notebook. You can write, draw, and add content directly on the pages - just like a physical book!
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="content">Initial Content (Optional)</Label>
+                <Textarea
+                  id="content"
+                  value={formData.content}
+                  onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                  placeholder="Add some initial content, or leave blank to start with empty pages..."
+                  rows={4}
+                />
+              </div>
             </div>
           )}
 

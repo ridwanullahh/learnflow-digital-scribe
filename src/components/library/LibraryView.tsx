@@ -94,41 +94,50 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background safe-area-top">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <div className="sticky top-0 z-10 glass border-b border-border/50">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <BookOpen className="w-6 h-6 text-primary" />
-            <h1 className="text-xl font-bold text-foreground">My Library</h1>
-            {isOffline && <WifiOff className="w-4 h-4 text-muted-foreground" />}
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+              <BookOpen className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">My Library</h1>
+              {isOffline && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <WifiOff className="w-3 h-3" />
+                  Offline Mode
+                </div>
+              )}
+            </div>
           </div>
-          <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="mobile-button rounded-full px-6">
             <Plus className="w-4 h-4 mr-2" />
             Add Book
           </Button>
         </div>
 
         {/* Search and Filters */}
-        <div className="px-4 pb-4 space-y-3">
+        <div className="px-4 pb-4 space-y-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search books..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="mobile-input pl-11 h-12 text-base"
             />
           </div>
           
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
             {categories.map((category) => (
               <Button
                 key={category}
                 variant={selectedCategory === category ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedCategory(category)}
-                className="whitespace-nowrap"
+                className="mobile-button whitespace-nowrap min-w-fit px-4"
               >
                 {category.charAt(0).toUpperCase() + category.slice(1)}
               </Button>
@@ -137,17 +146,19 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
           
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Filter className="w-4 h-4 text-primary" />
+              </div>
+              <span className="text-sm font-medium text-foreground">
                 {filteredBooks.length} books
               </span>
             </div>
-            <div className="flex border border-border rounded-lg">
+            <div className="flex bg-muted/50 rounded-xl p-1">
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
-                className="rounded-r-none"
+                className="rounded-lg h-8 px-3"
               >
                 <Grid3X3 className="w-4 h-4" />
               </Button>
@@ -155,7 +166,7 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
                 variant={viewMode === 'list' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('list')}
-                className="rounded-l-none"
+                className="rounded-lg h-8 px-3"
               >
                 <List className="w-4 h-4" />
               </Button>
@@ -165,24 +176,26 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
       </div>
 
       {/* Books Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 safe-area-bottom">
         {filteredBooks.length === 0 ? (
-          <div className="text-center py-12">
-            <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
+          <div className="flex flex-col items-center justify-center py-12 px-6">
+            <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center mb-6">
+              <BookOpen className="w-12 h-12 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-3 text-center">
               {searchTerm ? 'No books found' : 'Your library is empty'}
             </h3>
-            <p className="text-muted-foreground mb-6">
-              {searchTerm ? 'Try adjusting your search terms' : 'Add your first book to get started'}
+            <p className="text-muted-foreground mb-8 text-center max-w-md">
+              {searchTerm ? 'Try adjusting your search terms or explore different categories' : 'Start your learning journey by adding your first book'}
             </p>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
+            <Button onClick={() => setIsCreateDialogOpen(true)} className="mobile-button h-12 px-8">
+              <Plus className="w-5 h-5 mr-2" />
               Add Your First Book
             </Button>
           </div>
         ) : (
           <div className={viewMode === 'grid' 
-            ? 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' 
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' 
             : 'space-y-3'
           }>
             {filteredBooks.map((book) => (
