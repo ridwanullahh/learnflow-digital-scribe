@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { X, Type, Palette, Volume2 } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
-import { Slider } from '../ui/slider';
+// import { Slider } from '../ui/slider';
 
 interface ReaderSettingsProps {
   fontSize: number;
@@ -65,9 +65,10 @@ export const ReaderSettings = ({
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <Slider
-                  value={[fontSize]}
-                  onValueChange={(value) => onFontSizeChange(value[0])}
+                <input
+                  type="range"
+                  value={fontSize}
+                  onChange={(e) => onFontSizeChange(Number(e.target.value))}
                   max={24}
                   min={12}
                   step={1}
@@ -157,9 +158,10 @@ export const ReaderSettings = ({
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <Slider
-                  value={[readingSpeed]}
-                  onValueChange={(value) => onReadingSpeedChange(value[0])}
+                <input
+                  type="range"
+                  value={readingSpeed}
+                  onChange={(e) => onReadingSpeedChange(Number(e.target.value))}
                   max={2}
                   min={0.5}
                   step={0.1}
