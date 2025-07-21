@@ -41,7 +41,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [sdk, setSdk] = useState<any>(null);
   const [preferences, setPreferences] = useState<UserPreferences>({
-    theme: 'dark',
+    theme: 'light',
     language: 'en',
     ttsSettings: {
       voice: '',
