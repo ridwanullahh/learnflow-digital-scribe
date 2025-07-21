@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
-import { BookOpen, Search, Plus, Filter, Grid3X3, List, Star, Clock, Download, Wifi, WifiOff } from 'lucide-react';
+import { BookOpen, Search, Filter, Grid3X3, List, WifiOff } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
-import { CreateBookDialog } from './CreateBookDialog';
+import { QuickBookCreator } from './QuickBookCreator';
 import { BookCard } from './BookCard';
 
 interface Book {
@@ -20,6 +20,7 @@ interface Book {
   isOfflineAvailable?: boolean;
   language: string;
   userId: string;
+  mode?: 'physical-book' | 'ebook';
 }
 
 interface LibraryViewProps {
@@ -32,10 +33,11 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [showCreateBook, setShowCreateBook] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreatingBook, setIsCreatingBook] = useState(false);
 
-  const categories = ['all', 'fiction', 'non-fiction', 'academic', 'technical', 'language'];
+  const categories = ['all', 'general', 'fiction', 'non-fiction', 'academic', 'technical', 'language', 'imported'];
 
   useEffect(() => {
     loadBooks();
@@ -54,6 +56,7 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
       setBooks(userBooks);
     } catch (error) {
       console.error('Failed to load books:', error);
+      setBooks([]);
     } finally {
       setIsLoading(false);
     }
@@ -70,18 +73,23 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
     if (!sdk || !user) return;
     
     try {
+      setIsCreatingBook(true);
       const newBook = await sdk.insert('books', {
         ...bookData,
         userId: user.id,
         readingProgress: 0,
-        totalPages: 1,
-        lastRead: new Date().toISOString()
+        totalPages: bookData.pages?.length || 1,
+        lastRead: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
       
       setBooks(prev => [newBook, ...prev]);
-      setIsCreateDialogOpen(false);
+      setShowCreateBook(false);
     } catch (error) {
       console.error('Failed to create book:', error);
+    } finally {
+      setIsCreatingBook(false);
     }
   };
 
@@ -103,9 +111,9 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
             <h1 className="text-xl font-bold text-foreground">My Library</h1>
             {isOffline && <WifiOff className="w-4 h-4 text-muted-foreground" />}
           </div>
-          <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Book
+          <Button onClick={() => setShowCreateBook(true)} size="sm">
+            <BookOpen className="w-4 h-4 mr-2" />
+            New Book
           </Button>
         </div>
 
@@ -166,6 +174,25 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
 
       {/* Books Content */}
       <div className="flex-1 overflow-y-auto p-4">
+        {showCreateBook ? (
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <QuickBookCreator 
+                onCreateBook={handleCreateBook}
+                isLoading={isCreatingBook}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreateBook(false)}
+                className="absolute -top-2 -right-2 h-8 w-8 rounded-full p-0"
+              >
+                ×
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         {filteredBooks.length === 0 ? (
           <div className="text-center py-12">
             <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
@@ -173,11 +200,11 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
               {searchTerm ? 'No books found' : 'Your library is empty'}
             </h3>
             <p className="text-muted-foreground mb-6">
-              {searchTerm ? 'Try adjusting your search terms' : 'Add your first book to get started'}
+              {searchTerm ? 'Try adjusting your search terms' : 'Create your first book to get started'}
             </p>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Your First Book
+            <Button onClick={() => setShowCreateBook(true)}>
+              <BookOpen className="w-4 h-4 mr-2" />
+              Create Your First Book
             </Button>
           </div>
         ) : (
@@ -196,12 +223,6 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
           </div>
         )}
       </div>
-
-      <CreateBookDialog
-        isOpen={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
-        onSubmit={handleCreateBook}
-      />
     </div>
   );
 };

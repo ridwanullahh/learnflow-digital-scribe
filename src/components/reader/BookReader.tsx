@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
-import { ArrowLeft, BookOpen, Settings, Volume2, Brain, Eye, ChevronLeft, ChevronRight, Menu, Palette } from 'lucide-react';
+import { ArrowLeft, BookOpen, Settings, Volume2, Brain, Eye, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
-import { ReadingCanvas } from './ReadingCanvas';
+import { PhysicalBookCanvas } from './PhysicalBookCanvas';
 import { AIToolsPanel } from './AIToolsPanel';
 import { ReaderSettings } from './ReaderSettings';
 
@@ -53,7 +53,10 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
   };
 
   const handlePageChange = async (newPage: number) => {
-    if (newPage < 1 || newPage > (book?.totalPages || 1)) return;
+    if (!book) return;
+    
+    const totalPages = book.pages?.length || 1;
+    if (newPage < 1 || newPage > totalPages) return;
     
     setCurrentPage(newPage);
     
@@ -83,12 +86,90 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
     }
   };
 
+  const addNewPage = async () => {
+    if (!book || !sdk) return;
+    
+    const newPageNumber = (book.pages?.length || 0) + 1;
+    const newPage = {
+      id: Date.now().toString(),
+      pageNumber: newPageNumber,
+      content: '',
+      annotations: [],
+      drawings: [],
+      blurLayers: []
+    };
+    
+    const updatedPages = [...(book.pages || []), newPage];
+    
+    try {
+      await sdk.update('books', bookId, {
+        pages: updatedPages,
+        totalPages: updatedPages.length,
+        updatedAt: new Date().toISOString()
+      });
+      
+      setBook(prev => ({
+        ...prev,
+        pages: updatedPages,
+        totalPages: updatedPages.length
+      }));
+      
+      setCurrentPage(newPageNumber);
+    } catch (error) {
+      console.error('Failed to add page:', error);
+    }
+  };
+
+  const handleContentChange = async (content: string) => {
+    if (!book || !sdk) return;
+    
+    const updatedPages = book.pages?.map((page: any) => 
+      page.pageNumber === currentPage ? { ...page, content } : page
+    ) || [];
+    
+    try {
+      await sdk.update('books', bookId, {
+        pages: updatedPages,
+        content: content, // Also update main content
+        updatedAt: new Date().toISOString()
+      });
+      
+      setBook(prev => ({
+        ...prev,
+        pages: updatedPages,
+        content
+      }));
+    } catch (error) {
+      console.error('Failed to update content:', error);
+    }
+  };
+
+  const handleSaveAnnotation = async (annotation: any) => {
+    if (!sdk || !user) return;
+    
+    try {
+      await sdk.insert('annotations', {
+        bookId,
+        userId: user.id,
+        pageNumber: currentPage,
+        content: annotation.data || '',
+        type: annotation.type,
+        position: annotation.position || { x: 0, y: 0 },
+        createdAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to save annotation:', error);
+    }
+  };
+
   const handleTTSToggle = async () => {
     if (isReading) {
       ttsService.stop();
       setIsReading(false);
     } else {
-      const text = getCurrentPageText();
+      const currentPageData = book.pages?.find((p: any) => p.pageNumber === currentPage);
+      const text = currentPageData?.content || '';
+      
       if (text) {
         await ttsService.speak(text, {
           rate: readingSpeed,
@@ -99,18 +180,6 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
     }
   };
 
-  const getCurrentPageText = () => {
-    if (!book?.content) return '';
-    
-    // Simple pagination logic - split content into pages
-    const wordsPerPage = 300;
-    const words = book.content.split(' ');
-    const startIndex = (currentPage - 1) * wordsPerPage;
-    const endIndex = startIndex + wordsPerPage;
-    
-    return words.slice(startIndex, endIndex).join(' ');
-  };
-
   if (!book) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -118,6 +187,15 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
       </div>
     );
   }
+
+  const currentPageData = book.pages?.find((p: any) => p.pageNumber === currentPage) || {
+    pageNumber: currentPage,
+    content: '',
+    annotations: [],
+    drawings: []
+  };
+
+  const totalPages = book.pages?.length || 1;
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -173,16 +251,17 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
       <div className="flex flex-1 overflow-hidden">
         {/* Reading Area */}
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 p-4 overflow-y-auto">
-            <ReadingCanvas
-              content={getCurrentPageText()}
-              blurMode={blurMode}
-              blurLevel={blurLevel}
-              fontSize={fontSize}
-              backgroundColor={backgroundColor}
-              textColor={textColor}
+          <div className="flex-1 p-4 overflow-hidden">
+            <PhysicalBookCanvas
               bookId={bookId}
               pageNumber={currentPage}
+              pageContent={currentPageData.content}
+              onContentChange={handleContentChange}
+              onSaveAnnotation={handleSaveAnnotation}
+              blurMode={blurMode}
+              blurLevel={blurLevel}
+              onBlurToggle={() => setBlurMode(!blurMode)}
+              onBlurLevelChange={setBlurLevel}
             />
           </div>
 
@@ -198,15 +277,22 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <span className="text-sm text-muted-foreground min-w-0">
-                Page {currentPage} of {book.totalPages || 1}
+                Page {currentPage} of {totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === (book.totalPages || 1)}
+                disabled={currentPage === totalPages}
               >
                 <ChevronRight className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addNewPage}
+              >
+                <Plus className="w-4 h-4" />
               </Button>
             </div>
 
@@ -217,30 +303,10 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
                 </span>
               )}
               <span className="text-xs text-muted-foreground">
-                {Math.round((currentPage / (book.totalPages || 1)) * 100)}% complete
+                {Math.round((currentPage / totalPages) * 100)}% complete
               </span>
             </div>
           </div>
-
-          {/* Blur Level Control */}
-          {blurMode && (
-            <div className="p-4 border-t border-border bg-background/95 backdrop-blur">
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground">Blur Level:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={blurLevel}
-                  onChange={(e) => setBlurLevel(Number(e.target.value))}
-                  className="flex-1"
-                />
-                <span className="text-sm text-muted-foreground min-w-0">
-                  {blurLevel}%
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* AI Tools Panel */}
@@ -248,7 +314,7 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
           <AIToolsPanel
             bookId={bookId}
             currentPage={currentPage}
-            content={getCurrentPageText()}
+            content={currentPageData.content}
             geminiService={geminiService}
             onClose={() => setShowAIPanel(false)}
           />
