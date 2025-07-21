@@ -1,3 +1,4 @@
+
 import UniversalSDK, { 
   UniversalSDKConfig, 
   User, 
@@ -169,38 +170,7 @@ export const initializeSDK = async () => {
   const sdk = new UniversalSDK(sdkConfig);
   await sdk.init();
   
-  // Create initial repository structure if empty
-  try {
-    await sdk.request('db', 'GET');
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('empty')) {
-      console.log('Initializing empty repository...');
-      
-      // Create the db directory with a README
-      await sdk.request('db/README.md', 'PUT', {
-        message: 'Initialize LearnFlow database',
-        content: btoa('# LearnFlow Database\n\nThis directory contains the LearnFlow application data.'),
-        branch: sdkConfig.branch,
-      });
-    }
-  }
-  
-  // Auto-create collections if they don't exist
-  const collections = Object.keys(sdkConfig.schemas || {});
-  for (const collection of collections) {
-    try {
-      await sdk.get(collection);
-    } catch (error) {
-      // Collection doesn't exist, create it with empty array
-      console.log(`Creating collection: ${collection}`);
-      await sdk.request(`${sdkConfig.basePath}/${collection}.json`, 'PUT', {
-        message: `Initialize ${collection} collection`,
-        content: btoa(JSON.stringify([], null, 2)),
-        branch: sdkConfig.branch,
-      });
-    }
-  }
-  
+  // The SDK now handles initialization internally
   return sdk;
 };
 

@@ -220,7 +220,7 @@ class UniversalSDK {
     };
   }
 
-  private async request(path: string, method: string = "GET", body: any = null, etag?: string): Promise<any> {
+  public async request(path: string, method: string = "GET", body: any = null, etag?: string): Promise<any> {
     const url = `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${path}` +
                 (method === "GET" ? `?ref=${this.branch}` : "");
     
@@ -1034,7 +1034,38 @@ class UniversalSDK {
   }
 
   async init(): Promise<UniversalSDK> {
-    await this.listCollections();
+    // Create initial repository structure if empty
+    try {
+      await this.request(this.basePath, 'GET');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('empty')) {
+        console.log('Initializing empty repository...');
+        
+        // Create the db directory with a README
+        await this.request(`${this.basePath}/README.md`, 'PUT', {
+          message: 'Initialize LearnFlow database',
+          content: btoa('# LearnFlow Database\n\nThis directory contains the LearnFlow application data.'),
+          branch: this.branch,
+        });
+      }
+    }
+    
+    // Auto-create collections if they don't exist
+    const collections = Object.keys(this.schemas || {});
+    for (const collection of collections) {
+      try {
+        await this.get(collection);
+      } catch (error) {
+        // Collection doesn't exist, create it with empty array
+        console.log(`Creating collection: ${collection}`);
+        await this.request(`${this.basePath}/${collection}.json`, 'PUT', {
+          message: `Initialize ${collection} collection`,
+          content: btoa(JSON.stringify([], null, 2)),
+          branch: this.branch,
+        });
+      }
+    }
+    
     return this;
   }
 
