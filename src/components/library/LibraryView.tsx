@@ -1,78 +1,117 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
-import { BookOpen, Search, Plus, Grid, List, Filter } from 'lucide-react';
+import { BookOpen, Search, Plus, Filter, Grid3X3, List, Star, Clock, Download, Wifi, WifiOff } from 'lucide-react';
+import { useApp } from '../../contexts/AppContext';
+import { CreateBookDialog } from './CreateBookDialog';
+import { BookCard } from './BookCard';
+
+interface Book {
+  id: string;
+  title: string;
+  author: string;
+  category: string;
+  readingProgress: number;
+  totalPages: number;
+  lastRead: string;
+  coverImage?: string;
+  isOfflineAvailable?: boolean;
+  language: string;
+  userId: string;
+}
 
 interface LibraryViewProps {
   onBookSelect: (bookId: string) => void;
 }
 
 export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
+  const { sdk, isOffline, user } = useApp();
+  const [books, setBooks] = useState<Book[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock books data
-  const books = [
-    {
-      id: '1',
-      title: 'The Art of Learning',
-      author: 'Josh Waitzkin',
-      cover: '/placeholder.svg',
-      progress: 45,
-      lastRead: '2 days ago',
-      category: 'Self-Improvement'
-    },
-    {
-      id: '2',
-      title: 'Deep Work',
-      author: 'Cal Newport',
-      cover: '/placeholder.svg',
-      progress: 78,
-      lastRead: '1 week ago',
-      category: 'Productivity'
-    },
-    {
-      id: '3',
-      title: 'Atomic Habits',
-      author: 'James Clear',
-      cover: '/placeholder.svg',
-      progress: 100,
-      lastRead: '3 days ago',
-      category: 'Self-Improvement'
-    },
-    {
-      id: '4',
-      title: 'The Feynman Technique',
-      author: 'Richard Feynman',
-      cover: '/placeholder.svg',
-      progress: 23,
-      lastRead: '1 day ago',
-      category: 'Science'
+  const categories = ['all', 'fiction', 'non-fiction', 'academic', 'technical', 'language'];
+
+  useEffect(() => {
+    loadBooks();
+  }, [sdk, user]);
+
+  const loadBooks = async () => {
+    if (!sdk || !user) return;
+    
+    try {
+      setIsLoading(true);
+      const userBooks = await sdk.queryBuilder('books')
+        .where((book: Book) => book.userId === user.id)
+        .sort('updatedAt', 'desc')
+        .exec();
+      
+      setBooks(userBooks);
+    } catch (error) {
+      console.error('Failed to load books:', error);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
-  const filteredBooks = books.filter(book =>
-    book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    book.author.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBooks = books.filter(book => {
+    const matchesSearch = book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         book.author.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || book.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const handleCreateBook = async (bookData: Partial<Book>) => {
+    if (!sdk || !user) return;
+    
+    try {
+      const newBook = await sdk.insert('books', {
+        ...bookData,
+        userId: user.id,
+        readingProgress: 0,
+        totalPages: 1,
+        lastRead: new Date().toISOString()
+      });
+      
+      setBooks(prev => [newBook, ...prev]);
+      setIsCreateDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to create book:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full p-6">
-      {/* Library Header */}
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">My Library</h1>
-          <Button>
+    <div className="flex flex-col h-full bg-background">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <BookOpen className="w-6 h-6 text-primary" />
+            <h1 className="text-xl font-bold text-foreground">My Library</h1>
+            {isOffline && <WifiOff className="w-4 h-4 text-muted-foreground" />}
+          </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
             <Plus className="w-4 h-4 mr-2" />
             Add Book
           </Button>
         </div>
 
         {/* Search and Filters */}
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="px-4 pb-4 space-y-3">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search books..."
@@ -81,122 +120,88 @@ export const LibraryView = ({ onBookSelect }: LibraryViewProps) => {
               className="pl-10"
             />
           </div>
-          <Button variant="outline" size="icon">
-            <Filter className="w-4 h-4" />
-          </Button>
-          <div className="flex border border-border rounded-md">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="icon"
-              onClick={() => setViewMode('grid')}
-              className="rounded-r-none"
-            >
-              <Grid className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="icon"
-              onClick={() => setViewMode('list')}
-              className="rounded-l-none"
-            >
-              <List className="w-4 h-4" />
-            </Button>
+          
+          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+            {categories.map((category) => (
+              <Button
+                key={category}
+                variant={selectedCategory === category ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(category)}
+                className="whitespace-nowrap"
+              >
+                {category.charAt(0).toUpperCase() + category.slice(1)}
+              </Button>
+            ))}
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                {filteredBooks.length} books
+              </span>
+            </div>
+            <div className="flex border border-border rounded-lg">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="rounded-r-none"
+              >
+                <Grid3X3 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="rounded-l-none"
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Books Grid/List */}
-      <div className="flex-1 overflow-y-auto">
-        {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredBooks.map((book) => (
-              <Card 
-                key={book.id} 
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => onBookSelect(book.id)}
-              >
-                <CardHeader className="pb-4">
-                  <div className="aspect-[3/4] bg-muted rounded-lg mb-3 flex items-center justify-center">
-                    <BookOpen className="w-12 h-12 text-muted-foreground" />
-                  </div>
-                  <CardTitle className="text-base line-clamp-2">{book.title}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{book.author}</p>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{book.progress}% complete</span>
-                      <span>{book.lastRead}</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-1.5">
-                      <div 
-                        className="bg-primary h-1.5 rounded-full transition-all" 
-                        style={{ width: `${book.progress}%` }}
-                      />
-                    </div>
-                    <span className="inline-block text-xs bg-muted text-muted-foreground px-2 py-1 rounded">
-                      {book.category}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredBooks.map((book) => (
-              <Card 
-                key={book.id} 
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => onBookSelect(book.id)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-20 bg-muted rounded flex items-center justify-center flex-shrink-0">
-                      <BookOpen className="w-6 h-6 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate">{book.title}</h3>
-                      <p className="text-sm text-muted-foreground">{book.author}</p>
-                      <div className="flex items-center gap-4 mt-2">
-                        <div className="flex-1">
-                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                            <span>{book.progress}% complete</span>
-                            <span>{book.lastRead}</span>
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-1.5">
-                            <div 
-                              className="bg-primary h-1.5 rounded-full transition-all" 
-                              style={{ width: `${book.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                        <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded">
-                          {book.category}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {filteredBooks.length === 0 && (
+      {/* Books Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {filteredBooks.length === 0 ? (
           <div className="text-center py-12">
             <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">No books found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm ? 'Try adjusting your search terms' : 'Start building your library'}
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              {searchTerm ? 'No books found' : 'Your library is empty'}
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              {searchTerm ? 'Try adjusting your search terms' : 'Add your first book to get started'}
             </p>
-            <Button>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add Your First Book
             </Button>
           </div>
+        ) : (
+          <div className={viewMode === 'grid' 
+            ? 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' 
+            : 'space-y-3'
+          }>
+            {filteredBooks.map((book) => (
+              <BookCard
+                key={book.id}
+                book={book}
+                viewMode={viewMode}
+                onClick={() => onBookSelect(book.id)}
+              />
+            ))}
+          </div>
         )}
       </div>
+
+      <CreateBookDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onSubmit={handleCreateBook}
+      />
     </div>
   );
 };

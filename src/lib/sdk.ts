@@ -8,11 +8,11 @@ import UniversalSDK, {
   MediaAttachment 
 } from './UniversalSDK';
 
-// SDK Configuration - users will need to provide their own GitHub token and repo details
+// SDK Configuration with environment variables
 const sdkConfig: UniversalSDKConfig = {
-  owner: process.env.VITE_GITHUB_OWNER || 'your-github-username',
-  repo: process.env.VITE_GITHUB_REPO || 'learnflow-db',
-  token: process.env.VITE_GITHUB_TOKEN || '',
+  owner: import.meta.env.VITE_GITHUB_OWNER || 'your-github-username',
+  repo: import.meta.env.VITE_GITHUB_REPO || 'learnflow-db',
+  token: import.meta.env.VITE_GITHUB_TOKEN || '',
   branch: 'main',
   basePath: 'db',
   mediaPath: 'media',
@@ -26,7 +26,23 @@ const sdkConfig: UniversalSDKConfig = {
         createdAt: 'date',
         updatedAt: 'date'
       },
-      required: ['email']
+      required: ['email'],
+      defaults: {
+        preferences: {
+          theme: 'dark',
+          language: 'en',
+          difficultyLevel: 1,
+          autoSave: true,
+          offlineMode: false,
+          ttsSettings: {
+            voice: '',
+            speed: 1,
+            pitch: 1
+          }
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
     },
     books: {
       types: {
@@ -36,10 +52,23 @@ const sdkConfig: UniversalSDKConfig = {
         pages: 'array',
         userId: 'string',
         isPublic: 'boolean',
+        category: 'string',
+        language: 'string',
+        readingProgress: 'number',
+        totalPages: 'number',
+        coverImage: 'string',
         createdAt: 'date',
         updatedAt: 'date'
       },
-      required: ['title', 'content', 'userId']
+      required: ['title', 'content', 'userId'],
+      defaults: {
+        isPublic: false,
+        readingProgress: 0,
+        totalPages: 1,
+        language: 'en',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
     },
     annotations: {
       types: {
@@ -49,9 +78,15 @@ const sdkConfig: UniversalSDKConfig = {
         content: 'string',
         type: 'string',
         position: 'object',
+        color: 'string',
         createdAt: 'date'
       },
-      required: ['bookId', 'userId', 'content', 'type']
+      required: ['bookId', 'userId', 'content', 'type'],
+      defaults: {
+        pageNumber: 1,
+        color: '#ffeb3b',
+        createdAt: new Date().toISOString()
+      }
     },
     aiGeneratedContent: {
       types: {
@@ -60,9 +95,14 @@ const sdkConfig: UniversalSDKConfig = {
         type: 'string',
         content: 'string',
         pageRange: 'object',
+        cached: 'boolean',
         createdAt: 'date'
       },
-      required: ['bookId', 'userId', 'type', 'content']
+      required: ['bookId', 'userId', 'type', 'content'],
+      defaults: {
+        cached: true,
+        createdAt: new Date().toISOString()
+      }
     },
     learningProgress: {
       types: {
@@ -74,16 +114,79 @@ const sdkConfig: UniversalSDKConfig = {
         retentionScore: 'number',
         lastAccessed: 'date'
       },
-      required: ['bookId', 'userId', 'pageNumber']
+      required: ['bookId', 'userId', 'pageNumber'],
+      defaults: {
+        difficultyLevel: 1,
+        completionStatus: 'started',
+        retentionScore: 0,
+        lastAccessed: new Date().toISOString()
+      }
+    },
+    flashcards: {
+      types: {
+        bookId: 'string',
+        userId: 'string',
+        question: 'string',
+        answer: 'string',
+        difficulty: 'number',
+        nextReview: 'date',
+        repetitions: 'number',
+        createdAt: 'date'
+      },
+      required: ['bookId', 'userId', 'question', 'answer'],
+      defaults: {
+        difficulty: 1,
+        repetitions: 0,
+        nextReview: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      }
+    },
+    quizzes: {
+      types: {
+        bookId: 'string',
+        userId: 'string',
+        title: 'string',
+        questions: 'array',
+        pageRange: 'object',
+        score: 'number',
+        completedAt: 'date',
+        createdAt: 'date'
+      },
+      required: ['bookId', 'userId', 'title', 'questions'],
+      defaults: {
+        score: 0,
+        createdAt: new Date().toISOString()
+      }
     }
   },
   auth: {
     requireEmailVerification: false,
-    otpTriggers: ['register']
+    otpTriggers: []
   }
 };
 
-// Initialize SDK
+// Initialize SDK and auto-create collections
+export const initializeSDK = async () => {
+  const sdk = new UniversalSDK(sdkConfig);
+  await sdk.init();
+  
+  // Auto-create collections if they don't exist
+  const collections = Object.keys(sdkConfig.schemas || {});
+  for (const collection of collections) {
+    try {
+      await sdk.get(collection);
+    } catch (error) {
+      // Collection doesn't exist, create it with empty array
+      console.log(`Creating collection: ${collection}`);
+      await sdk.insert(collection, {});
+      await sdk.delete(collection, '1'); // Remove the dummy record
+    }
+  }
+  
+  return sdk;
+};
+
+// Export the SDK instance
 export const sdk = new UniversalSDK(sdkConfig);
 
 // Export types for use throughout the app

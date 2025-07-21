@@ -1,23 +1,24 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import sdk, { User } from '../lib/sdk';
+import { initializeSDK } from '../lib/sdk';
 import GeminiService from '../lib/gemini';
 import TTSService from '../lib/tts';
 import { UserPreferences } from '../types';
+import type { User } from '../lib/sdk';
 
 interface AppContextType {
   user: User | null;
   isAuthenticated: boolean;
   preferences: UserPreferences;
-  sdk: typeof sdk;
+  sdk: any;
   geminiService: GeminiService | null;
   ttsService: TTSService;
   isOffline: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   register: (email: string, password: string, name: string) => Promise<void>;
   updatePreferences: (prefs: Partial<UserPreferences>) => void;
-  initializeGemini: (apiKey: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -37,8 +38,10 @@ interface AppProviderProps {
 export const AppProvider = ({ children }: AppProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [sdk, setSdk] = useState<any>(null);
   const [preferences, setPreferences] = useState<UserPreferences>({
-    theme: 'light',
+    theme: 'dark',
     language: 'en',
     ttsSettings: {
       voice: '',
@@ -54,27 +57,44 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   useEffect(() => {
-    // Check for existing session
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      const currentUser = sdk.getCurrentUser(token);
-      if (currentUser) {
-        setUser(currentUser);
-        setIsAuthenticated(true);
+    const initializeApp = async () => {
+      try {
+        // Initialize SDK
+        const sdkInstance = await initializeSDK();
+        setSdk(sdkInstance);
+        
+        // Check for existing session
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          const currentUser = sdkInstance.getCurrentUser(token);
+          if (currentUser) {
+            setUser(currentUser);
+            setIsAuthenticated(true);
+          }
+        }
+
+        // Load preferences
+        const savedPreferences = localStorage.getItem('user_preferences');
+        if (savedPreferences) {
+          const parsed = JSON.parse(savedPreferences);
+          setPreferences(parsed);
+          ttsService.updateSettings(parsed.ttsSettings);
+        }
+
+        // Initialize Gemini if API key is available
+        const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (geminiApiKey) {
+          setGeminiService(new GeminiService(geminiApiKey));
+        }
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('App initialization failed:', error);
+        setIsLoading(false);
       }
-    }
+    };
 
-    // Load preferences
-    const savedPreferences = localStorage.getItem('user_preferences');
-    if (savedPreferences) {
-      setPreferences(JSON.parse(savedPreferences));
-    }
-
-    // Check for Gemini API key
-    const geminiApiKey = localStorage.getItem('gemini_api_key');
-    if (geminiApiKey) {
-      setGeminiService(new GeminiService(geminiApiKey));
-    }
+    initializeApp();
 
     // Listen for online/offline events
     const handleOnline = () => setIsOffline(false);
@@ -118,7 +138,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const register = async (email: string, password: string, name: string) => {
     try {
       const newUser = await sdk.register(email, password, { name });
-      // Auto-login after registration
       await login(email, password);
     } catch (error) {
       console.error('Registration failed:', error);
@@ -131,15 +150,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     setPreferences(newPreferences);
     localStorage.setItem('user_preferences', JSON.stringify(newPreferences));
     
-    // Update TTS settings if they changed
     if (prefs.ttsSettings) {
       ttsService.updateSettings(prefs.ttsSettings);
     }
-  };
-
-  const initializeGemini = (apiKey: string) => {
-    localStorage.setItem('gemini_api_key', apiKey);
-    setGeminiService(new GeminiService(apiKey));
   };
 
   return (
@@ -152,11 +165,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         geminiService,
         ttsService,
         isOffline,
+        isLoading,
         login,
         logout,
         register,
-        updatePreferences,
-        initializeGemini
+        updatePreferences
       }}
     >
       {children}

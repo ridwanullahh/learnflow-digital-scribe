@@ -1,8 +1,12 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
-import { ArrowLeft, BookOpen, Settings, Volume2, Brain, Eye } from 'lucide-react';
+import { ArrowLeft, BookOpen, Settings, Volume2, Brain, Eye, ChevronLeft, ChevronRight, Menu, Palette } from 'lucide-react';
+import { useApp } from '../../contexts/AppContext';
+import { ReadingCanvas } from './ReadingCanvas';
+import { AIToolsPanel } from './AIToolsPanel';
+import { ReaderSettings } from './ReaderSettings';
 
 interface BookReaderProps {
   bookId: string;
@@ -10,26 +14,135 @@ interface BookReaderProps {
 }
 
 export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
+  const { sdk, user, preferences, ttsService, geminiService, isOffline } = useApp();
+  const [book, setBook] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [blurMode, setBlurMode] = useState(false);
   const [blurLevel, setBlurLevel] = useState(50);
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isReading, setIsReading] = useState(false);
+  const [readingSpeed, setReadingSpeed] = useState(1);
+  const [fontSize, setFontSize] = useState(16);
+  const [backgroundColor, setBackgroundColor] = useState('#ffffff');
+  const [textColor, setTextColor] = useState('#000000');
+
+  useEffect(() => {
+    loadBook();
+  }, [bookId, sdk]);
+
+  const loadBook = async () => {
+    if (!sdk || !bookId) return;
+    
+    try {
+      const bookData = await sdk.getItem('books', bookId);
+      if (bookData) {
+        setBook(bookData);
+        // Load reading progress
+        const progress = await sdk.queryBuilder('learningProgress')
+          .where((item: any) => item.bookId === bookId && item.userId === user?.id)
+          .exec();
+        
+        if (progress.length > 0) {
+          setCurrentPage(progress[0].pageNumber);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load book:', error);
+    }
+  };
+
+  const handlePageChange = async (newPage: number) => {
+    if (newPage < 1 || newPage > (book?.totalPages || 1)) return;
+    
+    setCurrentPage(newPage);
+    
+    // Update reading progress
+    if (sdk && user) {
+      try {
+        const existingProgress = await sdk.queryBuilder('learningProgress')
+          .where((item: any) => item.bookId === bookId && item.userId === user.id)
+          .exec();
+        
+        if (existingProgress.length > 0) {
+          await sdk.update('learningProgress', existingProgress[0].id, {
+            pageNumber: newPage,
+            lastAccessed: new Date().toISOString()
+          });
+        } else {
+          await sdk.insert('learningProgress', {
+            bookId,
+            userId: user.id,
+            pageNumber: newPage,
+            lastAccessed: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update progress:', error);
+      }
+    }
+  };
+
+  const handleTTSToggle = async () => {
+    if (isReading) {
+      ttsService.stop();
+      setIsReading(false);
+    } else {
+      const text = getCurrentPageText();
+      if (text) {
+        await ttsService.speak(text, {
+          rate: readingSpeed,
+          voice: preferences.ttsSettings.voice
+        });
+        setIsReading(true);
+      }
+    }
+  };
+
+  const getCurrentPageText = () => {
+    if (!book?.content) return '';
+    
+    // Simple pagination logic - split content into pages
+    const wordsPerPage = 300;
+    const words = book.content.split(' ');
+    const startIndex = (currentPage - 1) * wordsPerPage;
+    const endIndex = startIndex + wordsPerPage;
+    
+    return words.slice(startIndex, endIndex).join(' ');
+  };
+
+  if (!book) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Reader Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
+    <div className="flex flex-col h-screen bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-border bg-background/95 backdrop-blur">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" />
-            <span className="font-medium">Sample Book {bookId}</span>
+            <div className="hidden sm:block">
+              <h1 className="font-semibold text-foreground">{book.title}</h1>
+              <p className="text-sm text-muted-foreground">{book.author}</p>
+            </div>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleTTSToggle}
+            className={isReading ? 'bg-primary/20' : ''}
+          >
             <Volume2 className="w-4 h-4" />
           </Button>
           <Button 
@@ -39,118 +152,122 @@ export const BookReader = ({ bookId, onBack }: BookReaderProps) => {
           >
             <Eye className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon">
+          <Button 
+            variant={showAIPanel ? "default" : "ghost"} 
+            size="icon"
+            onClick={() => setShowAIPanel(!showAIPanel)}
+          >
             <Brain className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => setShowSettings(!showSettings)}
+          >
             <Settings className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      {/* Reader Content */}
-      <div className="flex-1 flex">
-        {/* Main Reading Area */}
-        <div className="flex-1 p-6">
-          <Card className="h-full">
-            <CardContent className="p-8 h-full">
-              <div 
-                className="text-base leading-relaxed h-full overflow-y-auto"
-                style={{
-                  filter: blurMode ? `blur(${blurLevel / 10}px)` : 'none',
-                  transition: 'filter 0.3s ease'
-                }}
-              >
-                <h2 className="text-2xl font-bold mb-6">Chapter 1: Introduction to Learning</h2>
-                <p className="mb-4">
-                  Welcome to the world of enhanced digital reading. This is where your learning journey begins 
-                  with AI-powered tools and innovative features designed to help you retain information better.
-                </p>
-                <p className="mb-4">
-                  The human brain is capable of incredible feats of memory and understanding when given the 
-                  right tools and techniques. Through spaced repetition, active recall, and contextual learning, 
-                  we can dramatically improve our ability to acquire and retain knowledge.
-                </p>
-                <p className="mb-4">
-                  This book will guide you through proven methodologies for effective learning, enhanced by 
-                  modern technology and artificial intelligence. You'll discover how to transform passive 
-                  reading into active, engaging learning experiences.
-                </p>
-                <p className="mb-4">
-                  Traditional learning methods often rely on rote memorization and passive consumption of 
-                  information. However, research shows that active engagement with material leads to better 
-                  comprehension and long-term retention.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* AI Tools Sidebar */}
-        <div className="w-80 border-l border-border p-4 bg-muted/20">
-          <h3 className="font-semibold mb-4">Learning Tools</h3>
-          <div className="space-y-3">
-            <Button variant="outline" className="w-full justify-start">
-              <Brain className="w-4 h-4 mr-2" />
-              Generate Quiz
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              <BookOpen className="w-4 h-4 mr-2" />
-              Create Flashcards
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              <Settings className="w-4 h-4 mr-2" />
-              Key Points
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              <Volume2 className="w-4 h-4 mr-2" />
-              Summary
-            </Button>
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Reading Area */}
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 p-4 overflow-y-auto">
+            <ReadingCanvas
+              content={getCurrentPageText()}
+              blurMode={blurMode}
+              blurLevel={blurLevel}
+              fontSize={fontSize}
+              backgroundColor={backgroundColor}
+              textColor={textColor}
+              bookId={bookId}
+              pageNumber={currentPage}
+            />
           </div>
 
+          {/* Page Navigation */}
+          <div className="flex items-center justify-between p-4 border-t border-border bg-background/95 backdrop-blur">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground min-w-0">
+                Page {currentPage} of {book.totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === (book.totalPages || 1)}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isOffline && (
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                  Offline
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {Math.round((currentPage / (book.totalPages || 1)) * 100)}% complete
+              </span>
+            </div>
+          </div>
+
+          {/* Blur Level Control */}
           {blurMode && (
-            <div className="mt-6">
-              <label className="text-sm font-medium mb-2 block">Blur Level</label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={blurLevel}
-                onChange={(e) => setBlurLevel(Number(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Clear</span>
-                <span>Hidden</span>
+            <div className="p-4 border-t border-border bg-background/95 backdrop-blur">
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground">Blur Level:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={blurLevel}
+                  onChange={(e) => setBlurLevel(Number(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="text-sm text-muted-foreground min-w-0">
+                  {blurLevel}%
+                </span>
               </div>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Reader Footer */}
-      <div className="flex items-center justify-between p-4 border-t border-border">
-        <div className="text-sm text-muted-foreground">
-          Page {currentPage} of 50
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setCurrentPage(currentPage + 1)}
-            disabled={currentPage === 50}
-          >
-            Next
-          </Button>
-        </div>
+        {/* AI Tools Panel */}
+        {showAIPanel && (
+          <AIToolsPanel
+            bookId={bookId}
+            currentPage={currentPage}
+            content={getCurrentPageText()}
+            geminiService={geminiService}
+            onClose={() => setShowAIPanel(false)}
+          />
+        )}
+
+        {/* Settings Panel */}
+        {showSettings && (
+          <ReaderSettings
+            fontSize={fontSize}
+            onFontSizeChange={setFontSize}
+            backgroundColor={backgroundColor}
+            onBackgroundColorChange={setBackgroundColor}
+            textColor={textColor}
+            onTextColorChange={setTextColor}
+            readingSpeed={readingSpeed}
+            onReadingSpeedChange={setReadingSpeed}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
       </div>
     </div>
   );
