@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
-// import { Slider } from '../ui/slider';
+import { Slider } from '../ui/slider';
 import { 
   Pen, 
   Eraser, 
@@ -247,10 +247,9 @@ export const PhysicalBookCanvas = ({
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Size:</span>
-          <input
-            type="range"
-            value={strokeWidth}
-            onChange={(e) => setStrokeWidth(Number(e.target.value))}
+          <Slider
+            value={[strokeWidth]}
+            onValueChange={(value) => setStrokeWidth(value[0])}
             max={10}
             min={1}
             step={1}
@@ -308,10 +307,9 @@ export const PhysicalBookCanvas = ({
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Blur:</span>
-          <input
-            type="range"
-            value={blurLevel}
-            onChange={(e) => onBlurLevelChange(Number(e.target.value))}
+          <Slider
+            value={[blurLevel]}
+            onValueChange={(value) => onBlurLevelChange(value[0])}
             max={10}
             min={0}
             step={1}

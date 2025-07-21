@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
-// import { Slider } from '../ui/slider';
+import { Slider } from '../ui/slider';
 import { 
   Pen, 
   Eraser, 
@@ -197,10 +197,9 @@ export const ReadingCanvas = ({
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Size:</span>
-          <input
-            type="range"
-            value={strokeWidth}
-            onChange={(e) => setStrokeWidth(Number(e.target.value))}
+          <Slider
+            value={[strokeWidth]}
+            onValueChange={(value) => setStrokeWidth(value[0])}
             max={10}
             min={1}
             step={1}
@@ -240,10 +239,9 @@ export const ReadingCanvas = ({
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Difficulty:</span>
-          <input
-            type="range"
-            value={difficultyLevel}
-            onChange={(e) => onDifficultyChange(Number(e.target.value))}
+          <Slider
+            value={[difficultyLevel]}
+            onValueChange={(value) => onDifficultyChange(value[0])}
             max={5}
             min={1}
             step={1}
