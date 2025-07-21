@@ -1,26 +1,50 @@
 
 import * as React from "react"
-import * as SliderPrimitive from "@radix-ui/react-slider"
 import { cn } from "@/lib/utils"
 
-const Slider = React.forwardRef<
-  React.ElementRef<typeof SliderPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
->(({ className, ...props }, ref) => (
-  <SliderPrimitive.Root
-    ref={ref}
-    className={cn(
-      "relative flex w-full touch-none select-none items-center",
-      className
-    )}
-    {...props}
-  >
-    <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-secondary">
-      <SliderPrimitive.Range className="absolute h-full bg-primary" />
-    </SliderPrimitive.Track>
-    <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
-  </SliderPrimitive.Root>
-))
-Slider.displayName = SliderPrimitive.Root.displayName
+interface SliderProps {
+  value: number[]
+  onValueChange: (value: number[]) => void
+  max: number
+  min: number
+  step: number
+  className?: string
+}
+
+const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
+  ({ className, value, onValueChange, max, min, step, ...props }, ref) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      onValueChange([Number(e.target.value)])
+    }
+
+    const percentage = ((value[0] - min) / (max - min)) * 100
+
+    return (
+      <div className={cn("relative w-full", className)}>
+        <input
+          type="range"
+          ref={ref}
+          className={cn(
+            "w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:shadow-md",
+            "[&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:shadow-md"
+          )}
+          style={{
+            background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${percentage}%, hsl(var(--secondary)) ${percentage}%, hsl(var(--secondary)) 100%)`
+          }}
+          min={min}
+          max={max}
+          step={step}
+          value={value[0]}
+          onChange={handleChange}
+          {...props}
+        />
+      </div>
+    )
+  }
+)
+
+Slider.displayName = "Slider"
 
 export { Slider }
